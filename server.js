@@ -13,12 +13,19 @@ await connectDB();
 const app = express();
 app.use(express.json());
 
+// ✅ Test route
+app.get('/', (req, res) => {
+  res.send('Backend is running successfully!');
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/hotel-owner', hotelOwnerRoutes);
 app.use('/api/guests', guestRoutes);
+
 app.use(errorHandler);
 
 export default app; // 👈 Instead of app.listen()
+
 
 // const PORT = process.env.PORT || 8000;
 // app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
