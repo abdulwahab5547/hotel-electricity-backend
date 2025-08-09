@@ -1,6 +1,7 @@
 // server.js
 import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import hotelOwnerRoutes from './routes/hotelOwnerRoutes.js';
@@ -12,6 +13,8 @@ await connectDB();
 
 const app = express();
 app.use(express.json());
+
+app.use(cors({ origin: '*' }));
 
 // ✅ Test route
 app.get('/', (req, res) => {
