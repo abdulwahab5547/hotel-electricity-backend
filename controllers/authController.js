@@ -39,28 +39,36 @@ export const signup = async (req, res) => {
   }
 };
   
-  export const login = async (req, res) => {
-    const { email, password } = req.body;
-  
-    try {
-      const owner = await HotelOwner.findOne({ email });
-  
-      const isPasswordCorrect = owner && await bcrypt.compare(password, owner.password);
-  
-      if (!isPasswordCorrect) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-  
-      res.json({
-        _id: owner._id,
-        name: owner.name,
-        email: owner.email,
-        token: generateToken(owner._id),
-      });
-    } catch (error) {
-      res.status(500).json({ message: 'Server error' });
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const owner = await HotelOwner.findOne({ email });
+
+    if (!owner) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-  };
+
+    const isPasswordCorrect = await bcrypt.compare(password, owner.password);
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    res.json({
+      _id: owner._id,
+      firstName: owner.firstName,
+      lastName: owner.lastName,
+      buildingName: owner.buildingName,
+      email: owner.email,
+      token: generateToken(owner._id),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
   
 
 export const getMe = async (req, res) => {
