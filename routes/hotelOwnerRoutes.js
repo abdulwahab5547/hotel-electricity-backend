@@ -7,11 +7,13 @@ import {
   deleteHotelOwner
 } from '../controllers/hotelOwnerController.js';
 
-import { protect } from '../middleware/authMiddleware.js';
+import { protectAdmin } from '../middleware/adminAuthMiddleware.js';
 
 const router = express.Router();
 
-// Example: You can add protect middleware if only admins should use these
+// All routes require admin authentication
+router.use(protectAdmin);
+
 router.get('/', getAllHotelOwners);
 router.get('/:id', getHotelOwnerById);
 router.post('/', createHotelOwner);
