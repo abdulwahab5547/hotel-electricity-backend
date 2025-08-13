@@ -24,51 +24,57 @@ export const getHotelOwnerById = async (req, res) => {
 };
 
 // Create a new hotel owner (admin use)
+
 export const createHotelOwner = async (req, res) => {
-    const { name, email, password, contactName, accountNumber, unitNumbers, meterIds } = req.body;
-  
-    console.log('📥 Incoming request to create hotel owner:', {
-      name,
-      email,
-      contactName,
-      accountNumber,
-      unitNumbers,
-      meterIds,
-    });
-  
-    try {
-      const exists = await HotelOwner.findOne({ email });
-      if (exists) {
-        console.log('❌ Hotel owner already exists with email:', email);
-        return res.status(400).json({ message: 'Hotel owner already exists' });
-      }
-  
-      console.log('🔐 Hashing password...');
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      console.log('🛠 Creating new hotel owner...');
-      const newOwner = await HotelOwner.create({
-        name,
-        email,
-        password: hashedPassword,
-        contactName,
-        accountNumber,
-        unitNumbers,
-        meterIds,
-      });
-  
-      console.log('✅ Hotel owner created successfully:', newOwner._id);
-  
-      res.status(201).json({
-        _id: newOwner._id,
-        name: newOwner.name,
-        email: newOwner.email,
-      });
-    } catch (error) {
-      console.error('🔥 Error creating hotel owner:', error.message);
-      res.status(500).json({ message: 'Failed to create hotel owner' });
+  const { firstName, lastName, buildingName, email, password, meterIds } = req.body;
+
+  console.log('📥 Incoming request to create hotel owner:', {
+    firstName,
+    lastName,
+    buildingName,
+    email,
+    meterIds,
+  });
+
+  try {
+    // Check if hotel owner already exists
+    const exists = await HotelOwner.findOne({ email });
+    if (exists) {
+      console.log('❌ Hotel owner already exists with email:', email);
+      return res.status(400).json({ message: 'Hotel owner already exists' });
     }
-  };
+
+    // Hash password
+    console.log('🔐 Hashing password...');
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new hotel owner
+    console.log('🛠 Creating new hotel owner...');
+    const newOwner = await HotelOwner.create({
+      firstName,
+      lastName,
+      buildingName,
+      email,
+      password: hashedPassword,
+      meterIds: meterIds || [], // default to empty array if not provided
+      guests: [] // starts empty
+    });
+
+    console.log('✅ Hotel owner created successfully:', newOwner._id);
+
+    res.status(201).json({
+      _id: newOwner._id,
+      firstName: newOwner.firstName,
+      lastName: newOwner.lastName,
+      buildingName: newOwner.buildingName,
+      email: newOwner.email,
+      meterIds: newOwner.meterIds
+    });
+  } catch (error) {
+    console.error('🔥 Error creating hotel owner:', error.message);
+    res.status(500).json({ message: 'Failed to create hotel owner' });
+  }
+};
   
 
 // Update a hotel owner
