@@ -8,7 +8,7 @@ import { errorHandler } from './middleware/errorMiddleware.js';
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: '*' }));
+app.use(cors());
 
 // ✅ Test route
 app.get('/', (req, res) => {
