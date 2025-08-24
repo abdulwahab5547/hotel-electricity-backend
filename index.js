@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import app from './server.js';
+import { scheduleDentSync } from './utils/syncDentJob.js';
+// import Guest from './models/Guest.js';
 
 dotenv.config();
 
@@ -19,3 +21,10 @@ const startServer = async () => {
 };
 
 startServer();
+
+scheduleDentSync();
+
+// await Guest.updateMany(
+//   {}, 
+//   { $set: { meterID: "P242409044" } }
+// );

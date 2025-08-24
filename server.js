@@ -7,6 +7,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
 const app = express();
@@ -26,6 +27,10 @@ app.get('/test-db', async (req, res) => {
     res.status(500).json({ message: 'MongoDB connection failed', error: err.message });
   }
 });
+
+
+
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/hotel-owner', hotelOwnerRoutes);

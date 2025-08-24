@@ -1,25 +1,42 @@
 import Guest from '../models/Guest.js';
-
 // Get all guests
+// export const getAllGuests = async (req, res) => {
+//   try {
+//     const guests = await Guest.find({ hotelOwner: req.user._id });
+//     res.json(guests);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Failed to fetch guests' });
+//   }
+// };
+
+// Get single guest (just return DB values)
+export const getGuestById = async (req, res) => {
+  try {
+    const guest = await Guest.findOne({
+      _id: req.params.id,
+      hotelOwner: req.user._id,
+    });
+
+    if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+    res.json(guest);
+  } catch (error) {
+    console.error("Error in getGuestById:", error.message);
+    res.status(500).json({ message: "Error fetching guest" });
+  }
+};
+
+// Get all guests (just return DB values)
 export const getAllGuests = async (req, res) => {
   try {
     const guests = await Guest.find({ hotelOwner: req.user._id });
     res.json(guests);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch guests' });
+    console.error("Error in getAllGuests:", error.message);
+    res.status(500).json({ message: "Failed to fetch guests" });
   }
 };
 
-// Get a single guest by ID
-export const getGuestById = async (req, res) => {
-  try {
-    const guest = await Guest.findOne({ _id: req.params.id, hotelOwner: req.user._id });
-    if (!guest) return res.status(404).json({ message: 'Guest not found' });
-    res.json(guest);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching guest' });
-  }
-};
 
 // Create a new guest
 export const createGuest = async (req, res) => {
