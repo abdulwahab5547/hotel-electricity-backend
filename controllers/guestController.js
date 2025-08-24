@@ -1,4 +1,5 @@
 import Guest from '../models/Guest.js';
+import { checkoutGuest } from '../utils/checkoutGuest.js';
 // Get all guests
 // export const getAllGuests = async (req, res) => {
 //   try {
@@ -51,6 +52,9 @@ export const createGuest = async (req, res) => {
 // Update a guest
 export const updateGuest = async (req, res) => {
   try {
+    const prevGuest = await Guest.findOne({ _id: req.params.id, hotelOwner: req.user._id });
+    if (!prevGuest) return res.status(404).json({ message: 'Guest not found' });
+
     const updated = await Guest.findOneAndUpdate(
       { _id: req.params.id, hotelOwner: req.user._id },
       req.body,
@@ -58,11 +62,19 @@ export const updateGuest = async (req, res) => {
     );
 
     if (!updated) return res.status(404).json({ message: 'Guest not found' });
+
+    // ✅ Trigger checkout function only if status changes to checked_out
+    if (req.body.status && req.body.status === 'checked_out' && prevGuest.status !== 'checked_out') {
+      await checkoutGuest(updated); // pass updated guest data
+    }
+
     res.json(updated);
   } catch (error) {
+    console.error("Update Guest Error:", error);
     res.status(500).json({ message: 'Failed to update guest' });
   }
 };
+
 
 // Delete a guest
 export const deleteGuest = async (req, res) => {
