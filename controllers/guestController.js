@@ -2,7 +2,7 @@ import Guest from '../models/Guest.js';
 import { checkoutGuest } from '../utils/checkoutGuest.js';
 import { getMetersFromDentcloud } from '../utils/dentcloud.js';
 import Invoice from '../models/Invoice.js';
-
+import HotelOwner from '../models/HotelOwner.js';
 
 export const getMeters = async (req, res) => {
   try {
@@ -49,15 +49,54 @@ export const getGuestById = async (req, res) => {
 //   }
 // };
 
+// export const getAllGuests = async (req, res) => {
+//   try {
+//     const guests = await Guest.find({ hotelOwner: req.user._id });
+
+//     const guestsWithInvoice = await Promise.all(
+//       guests.map(async (guest) => {
+//         const invoice = await Invoice.findOne({ guest: guest._id })
+//           .sort({ createdAt: 1 }) // earliest invoice; use -1 for latest
+//           .lean();
+//         return { ...guest.toObject(), invoice };
+//       })
+//     );
+
+//     res.json(guestsWithInvoice);
+//   } catch (error) {
+//     console.error("Error in getAllGuests:", error.message);
+//     res.status(500).json({ message: "Failed to fetch guests" });
+//   }
+// };
+
+
+
 export const getAllGuests = async (req, res) => {
   try {
+    // fetch hotel owner details from token
+    const hotelOwner = await HotelOwner.findById(req.user._id).lean();
+    if (!hotelOwner) {
+      return res.status(404).json({ message: "Hotel Owner not found" });
+    }
+
+    // get all guests of this hotel owner
     const guests = await Guest.find({ hotelOwner: req.user._id });
 
+    // attach invoice (with hotelOwner info) for each guest
     const guestsWithInvoice = await Promise.all(
       guests.map(async (guest) => {
-        const invoice = await Invoice.findOne({ guest: guest._id })
+        let invoice = await Invoice.findOne({ guest: guest._id })
           .sort({ createdAt: 1 }) // earliest invoice; use -1 for latest
           .lean();
+
+        if (invoice) {
+          invoice = {
+            ...invoice,
+            invoiceLogo: hotelOwner.invoiceLogo || null,
+            buildingName: hotelOwner.buildingName || null,
+          };
+        }
+
         return { ...guest.toObject(), invoice };
       })
     );
