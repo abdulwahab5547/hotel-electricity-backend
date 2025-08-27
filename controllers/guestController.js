@@ -1,6 +1,7 @@
 import Guest from '../models/Guest.js';
 import { checkoutGuest } from '../utils/checkoutGuest.js';
 import { getMetersFromDentcloud } from '../utils/dentcloud.js';
+import Invoice from '../models/Invoice.js';
 
 
 export const getMeters = async (req, res) => {
@@ -38,10 +39,30 @@ export const getGuestById = async (req, res) => {
 };
 
 // Get all guests (just return DB values)
+// export const getAllGuests = async (req, res) => {
+//   try {
+//     const guests = await Guest.find({ hotelOwner: req.user._id });
+//     res.json(guests);
+//   } catch (error) {
+//     console.error("Error in getAllGuests:", error.message);
+//     res.status(500).json({ message: "Failed to fetch guests" });
+//   }
+// };
+
 export const getAllGuests = async (req, res) => {
   try {
     const guests = await Guest.find({ hotelOwner: req.user._id });
-    res.json(guests);
+
+    const guestsWithInvoice = await Promise.all(
+      guests.map(async (guest) => {
+        const invoice = await Invoice.findOne({ guest: guest._id })
+          .sort({ createdAt: 1 }) // earliest invoice; use -1 for latest
+          .lean();
+        return { ...guest.toObject(), invoice };
+      })
+    );
+
+    res.json(guestsWithInvoice);
   } catch (error) {
     console.error("Error in getAllGuests:", error.message);
     res.status(500).json({ message: "Failed to fetch guests" });
@@ -62,8 +83,18 @@ export const createGuest = async (req, res) => {
 // Update a guest
 export const updateGuest = async (req, res) => {
   try {
-    const prevGuest = await Guest.findOne({ _id: req.params.id, hotelOwner: req.user._id });
-    if (!prevGuest) return res.status(404).json({ message: 'Guest not found' });
+    // console.log("➡️ Update request body:", req.body);
+    
+    const prevGuest = await Guest.findOne({
+      _id: req.params.id,
+      hotelOwner: req.user._id,
+    });
+
+    // console.log("👀 Previous guest found:", prevGuest ? prevGuest._id : "none");
+
+    if (!prevGuest) {
+      return res.status(404).json({ message: "Guest not found" });
+    }
 
     const updated = await Guest.findOneAndUpdate(
       { _id: req.params.id, hotelOwner: req.user._id },
@@ -71,19 +102,31 @@ export const updateGuest = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updated) return res.status(404).json({ message: 'Guest not found' });
+    // console.log("✏️ Updated guest:", updated ? updated._id : "none");
 
-    // ✅ Trigger checkout function only if status changes to checked_out
-    if (req.body.status && req.body.status === 'checked_out' && prevGuest.status !== 'checked_out') {
-      await checkoutGuest(updated); // pass updated guest data
+    if (!updated) {
+      return res.status(404).json({ message: "Guest not found" });
+    }
+
+    // console.log("🔍 Status check: prev =", prevGuest.status, " new =", updated.status);
+    if (
+      req.body.status === "checked_out" &&
+      prevGuest.status !== "checked_out"
+    ) {
+      // console.log("⚡ Triggering checkout for guest:", updated._id);
+      const invoice = await checkoutGuest(updated);
+      // console.log("✅ Invoice created inside updateGuest:", invoice._id);
+    } else {
+      // console.log("⏭️ Checkout NOT triggered");
     }
 
     res.json(updated);
   } catch (error) {
-    console.error("Update Guest Error:", error);
-    res.status(500).json({ message: 'Failed to update guest' });
+    // console.error("Update Guest Error:", error);
+    res.status(500).json({ message: "Failed to update guest" });
   }
 };
+
 
 
 // Delete a guest

@@ -8,7 +8,8 @@ const hotelOwnerSchema = new mongoose.Schema({
   password: { type: String, required: true },
   meterIds: [{ type: String }], 
   guests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guest' }],
-  unitsConsumed: { type: Number }
+  unitsConsumed: { type: Number },
+  invoiceLogo: { type: String }, 
 }, { timestamps: true });
 
 const HotelOwner = mongoose.model('HotelOwner', hotelOwnerSchema);

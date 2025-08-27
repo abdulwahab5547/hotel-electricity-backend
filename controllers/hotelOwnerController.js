@@ -1,5 +1,37 @@
 import HotelOwner from '../models/HotelOwner.js';
 import bcrypt from 'bcryptjs';
+import uploadToCloudinary from '../utils/uploadToCloudinary.js';
+
+
+
+
+export const uploadInvoiceLogo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // console.log("📥 Uploading invoice logo for hotel owner:", req.user._id);
+
+    // upload to cloudinary
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
+
+    // update hotel owner record
+    const updatedOwner = await HotelOwner.findByIdAndUpdate(
+      req.user._id,
+      { $set: { invoiceLogo: imageUrl } },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      message: "Invoice logo uploaded successfully",
+      invoiceLogo: updatedOwner.invoiceLogo,
+    });
+  } catch (error) {
+    console.error("🔥 Error in uploading invoice logo:", error.message);
+    res.status(500).json({ message: "Failed to upload invoice logo" });
+  }
+};
 
 
 // Get all hotel owners
@@ -78,20 +110,73 @@ export const createHotelOwner = async (req, res) => {
   
 
 // Update a hotel owner
+// export const updateHotelOwner = async (req, res) => {
+//   const { id } = req.params;
+
+//   try {
+//     const updated = await HotelOwner.findByIdAndUpdate(id, req.body, {
+//       new: true,
+//       runValidators: true,
+//     }).select('-password');
+
+//     if (!updated) return res.status(404).json({ message: 'Hotel owner not found' });
+
+//     res.json(updated);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Failed to update hotel owner' });
+//   }
+// };
+
+// Self update controller
+export const updateMyProfile = async (req, res) => {
+  try {
+    console.log("📥 Hotel owner self-update request:", req.user._id, req.body);
+
+    const updated = await HotelOwner.findByIdAndUpdate(
+      req.user._id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updated) {
+      return res.status(404).json({ message: "Hotel owner not found" });
+    }
+
+    console.log("✅ Hotel owner updated his own profile:", updated._id);
+    res.json(updated);
+  } catch (error) {
+    console.error("🔥 Error in self-update:", error.message);
+    res.status(500).json({ message: "Failed to update profile" });
+  }
+};
+
 export const updateHotelOwner = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const updated = await HotelOwner.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true,
-    }).select('-password');
+    console.log("📥 Incoming update request for hotel owner:", id, req.body);
 
-    if (!updated) return res.status(404).json({ message: 'Hotel owner not found' });
+    // Update hotel owner
+    const updated = await HotelOwner.findByIdAndUpdate(
+      id,
+      { $set: req.body }, 
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select("-password");
+
+    if (!updated) {
+      console.log("❌ Hotel owner not found:", id);
+      return res.status(404).json({ message: "Hotel owner not found" });
+    }
+
+    console.log("✅ Hotel owner updated successfully:", updated._id);
 
     res.json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update hotel owner' });
+    console.error("🔥 Error updating hotel owner:", error.message);
+    res.status(500).json({ message: "Failed to update hotel owner" });
   }
 };
 
