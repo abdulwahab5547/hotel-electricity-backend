@@ -1,4 +1,6 @@
-import express from 'express';
+import dotenv from 'dotenv';
+dotenv.config();
+
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import hotelOwnerRoutes from './routes/hotelOwnerRoutes.js';
@@ -6,9 +8,13 @@ import guestRoutes from './routes/guestRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import express from 'express';
+import Guest from './models/Guest.js';
 
-dotenv.config();
+
+
+
+
 
 const app = express();
 app.use(express.json());
@@ -30,6 +36,32 @@ app.get('/test-db', async (req, res) => {
 
 
 
+app.get('/generate-invoices', async (req, res) => {
+  try {
+    const guests = await Guest.find();
+
+    if (!guests.length) {
+      return res.status(404).json({ message: "No guests found" });
+    }
+
+    // fake invoice generator for now
+    const invoices = guests.map((guest) => ({
+      guest: guest.name,
+      room: guest.room,
+      checkIn: guest.checkInDate,
+      checkOut: guest.checkOutDate,
+      usage: guest.usage,
+      billing: guest.billing,
+      status: guest.status,
+      createdAt: new Date()
+    }));
+
+    res.json({ message: "Invoices generated", invoices });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error generating invoices", error: err.message });
+  }
+});
 
 
 app.use('/api/auth', authRoutes);

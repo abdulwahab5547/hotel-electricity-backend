@@ -4,7 +4,8 @@ import {
   getGuestById,
   createGuest,
   updateGuest,
-  deleteGuest
+  deleteGuest,
+  getMeters
 } from '../controllers/guestController.js';
 
 import { protect } from '../middleware/authMiddleware.js';
@@ -14,6 +15,7 @@ const router = express.Router();
 // All routes protected — only logged-in hotel owners can access them
 router.use(protect);
 
+router.get('/meters', getMeters);
 router.get('/', getAllGuests);
 router.get('/:id', getGuestById);
 router.post('/', createGuest);

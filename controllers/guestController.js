@@ -1,16 +1,26 @@
 import Guest from '../models/Guest.js';
 import { checkoutGuest } from '../utils/checkoutGuest.js';
-// Get all guests
-// export const getAllGuests = async (req, res) => {
-//   try {
-//     const guests = await Guest.find({ hotelOwner: req.user._id });
-//     res.json(guests);
-//   } catch (error) {
-//     res.status(500).json({ message: 'Failed to fetch guests' });
-//   }
-// };
+import { getMetersFromDentcloud } from '../utils/dentcloud.js';
 
-// Get single guest (just return DB values)
+
+export const getMeters = async (req, res) => {
+  try {
+    const dentResponse = await getMetersFromDentcloud();
+
+    // Extract meters directly
+    const meters = dentResponse.meters || [];
+
+    // TODO: filter assigned meters from DB if needed
+    // e.g. const availableMeters = meters.filter(...)
+
+    res.status(200).json({ success: true, meters });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+
 export const getGuestById = async (req, res) => {
   try {
     const guest = await Guest.findOne({
