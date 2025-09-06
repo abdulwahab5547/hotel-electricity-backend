@@ -11,13 +11,19 @@ import {
 } from '../controllers/hotelOwnerController.js';
 
 import { protectAdmin } from '../middleware/adminAuthMiddleware.js';
+import { requirePlan } from '../middleware/planMiddleware.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(protect);
 router.put("/me", updateMyProfile);
-router.post("/upload-invoice-logo", upload.single("invoiceLogo"), uploadInvoiceLogo);
+router.post(
+  "/upload-invoice-logo",
+  requirePlan(["premium"]),
+  upload.single("invoiceLogo"),
+  uploadInvoiceLogo
+);
 
 // All routes require admin authentication
 router.use(protectAdmin);

@@ -7,31 +7,36 @@ import uploadToCloudinary from '../utils/uploadToCloudinary.js';
 
 export const uploadInvoiceLogo = async (req, res) => {
   try {
+    const owner = await HotelOwner.findById(req.user._id);
+
+    if (!owner) {
+      return res.status(404).json({ message: "Hotel owner not found" });
+    }
+
+    // ✅ Only premium can upload logo
+    if (owner.planType !== "premium") {
+      return res.status(403).json({ message: "Your plan does not allow logo customization" });
+    }
+
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // console.log("📥 Uploading invoice logo for hotel owner:", req.user._id);
-
-    // upload to cloudinary
     const imageUrl = await uploadToCloudinary(req.file.buffer);
 
-    // update hotel owner record
-    const updatedOwner = await HotelOwner.findByIdAndUpdate(
-      req.user._id,
-      { $set: { invoiceLogo: imageUrl } },
-      { new: true }
-    ).select("-password");
+    owner.invoiceLogo = imageUrl;
+    await owner.save();
 
     res.json({
       message: "Invoice logo uploaded successfully",
-      invoiceLogo: updatedOwner.invoiceLogo,
+      invoiceLogo: owner.invoiceLogo,
     });
   } catch (error) {
     console.error("🔥 Error in uploading invoice logo:", error.message);
     res.status(500).json({ message: "Failed to upload invoice logo" });
   }
 };
+
 
 
 // Get all hotel owners
@@ -58,7 +63,7 @@ export const getHotelOwnerById = async (req, res) => {
 // Create a new hotel owner (admin use)
 
 export const createHotelOwner = async (req, res) => {
-  const { firstName, lastName, buildingName, email, password, meterIds } = req.body;
+  const { firstName, lastName, buildingName, email, password, meterIds, planType } = req.body;
 
   console.log('📥 Incoming request to create hotel owner:', {
     firstName,
@@ -66,6 +71,7 @@ export const createHotelOwner = async (req, res) => {
     buildingName,
     email,
     meterIds,
+    planType,
   });
 
   try {
@@ -89,7 +95,8 @@ export const createHotelOwner = async (req, res) => {
       email,
       password: hashedPassword,
       meterIds: meterIds || [], // default to empty array if not provided
-      guests: [] // starts empty
+      guests: [], // starts empty
+      planType: planType || "basic" // default to basic if not provided
     });
 
     console.log('✅ Hotel owner created successfully:', newOwner._id);
@@ -100,13 +107,15 @@ export const createHotelOwner = async (req, res) => {
       lastName: newOwner.lastName,
       buildingName: newOwner.buildingName,
       email: newOwner.email,
-      meterIds: newOwner.meterIds
+      meterIds: newOwner.meterIds,
+      planType: newOwner.planType
     });
   } catch (error) {
     console.error('🔥 Error creating hotel owner:', error.message);
     res.status(500).json({ message: 'Failed to create hotel owner' });
   }
 };
+
   
 
 // Update a hotel owner

@@ -61,6 +61,7 @@ export const login = async (req, res) => {
       lastName: owner.lastName,
       buildingName: owner.buildingName,
       email: owner.email,
+      planType: owner.planType, // ✅ added this
       token: generateToken(owner._id),
     });
   } catch (error) {
@@ -68,6 +69,7 @@ export const login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
   
 
