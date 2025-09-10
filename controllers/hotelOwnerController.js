@@ -137,28 +137,83 @@ export const createHotelOwner = async (req, res) => {
 // };
 
 // Self update controller
+// export const updateMyProfile = async (req, res) => {
+//   try {
+//     console.log("📥 Hotel owner self-update request:", req.user._id, req.body);
+
+//     const updated = await HotelOwner.findByIdAndUpdate(
+//       req.user._id,
+//       { $set: req.body },
+//       { new: true, runValidators: true }
+//     ).select("-password");
+
+//     if (!updated) {
+//       return res.status(404).json({ message: "Hotel owner not found" });
+//     }
+
+//     console.log("✅ Hotel owner updated his own profile:", updated._id);
+//     res.json(updated);
+//   } catch (error) {
+//     console.error("🔥 Error in self-update:", error.message);
+//     res.status(500).json({ message: "Failed to update profile" });
+//   }
+// };
+
+
 export const updateMyProfile = async (req, res) => {
   try {
     console.log("📥 Hotel owner self-update request:", req.user._id, req.body);
 
-    const updated = await HotelOwner.findByIdAndUpdate(
-      req.user._id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    if (!updated) {
+    const owner = await HotelOwner.findById(req.user._id);
+    if (!owner) {
       return res.status(404).json({ message: "Hotel owner not found" });
     }
 
-    console.log("✅ Hotel owner updated his own profile:", updated._id);
-    res.json(updated);
+    // ✅ Only premium plan can update email app password settings
+    if (
+      ("useDefaultAppPassword" in req.body || "customAppPassword" in req.body) &&
+      owner.planType !== "premium"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Custom email password is only available for premium plan users" });
+    }
+
+    // Prevent exposing customAppPassword back in the response
+    const allowedUpdates = { ...req.body };
+    delete allowedUpdates.customAppPassword; // still saved, just not sent back in response
+
+    // Update the owner
+    if ("useDefaultAppPassword" in req.body) {
+      owner.useDefaultAppPassword = req.body.useDefaultAppPassword;
+    }
+    if ("customAppPassword" in req.body) {
+      owner.customAppPassword = req.body.customAppPassword;
+    }
+
+    // Update other allowed fields
+    Object.assign(owner, allowedUpdates);
+
+    await owner.save();
+
+    console.log("✅ Hotel owner updated his own profile:", owner._id);
+
+    const ownerSafe = owner.toObject();
+    delete ownerSafe.password;
+    delete ownerSafe.customAppPassword; // hide sensitive field
+
+    res.json(ownerSafe);
   } catch (error) {
     console.error("🔥 Error in self-update:", error.message);
     res.status(500).json({ message: "Failed to update profile" });
   }
 };
 
+
+
+
+
+// Admin use
 export const updateHotelOwner = async (req, res) => {
   const { id } = req.params;
 

@@ -23,7 +23,9 @@ const hotelOwnerSchema = new mongoose.Schema({
   guests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guest' }],
   unitsConsumed: { type: Number },
   invoiceLogo: { type: String }, 
-  planType: { type: String, enum: ["basic", "standard", "premium"], default: "basic" }
+  planType: { type: String, enum: ["basic", "standard", "premium"], default: "basic" },
+  useDefaultAppPassword: { type: Boolean, default: true }, 
+  customAppPassword: { type: String, default: null }
 }, { timestamps: true });
 
 

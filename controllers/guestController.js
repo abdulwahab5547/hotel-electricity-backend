@@ -3,6 +3,7 @@ import { checkoutGuest } from '../utils/checkoutGuest.js';
 import { getMetersFromDentcloud } from '../utils/dentcloud.js';
 import Invoice from '../models/Invoice.js';
 import HotelOwner from '../models/HotelOwner.js';
+import { emailInvoice } from '../utils/emailInvoice.js';
 
 export const getMeters = async (req, res) => {
   try {
@@ -129,7 +130,7 @@ export const updateGuest = async (req, res) => {
       hotelOwner: req.user._id,
     });
 
-    // console.log("👀 Previous guest found:", prevGuest ? prevGuest._id : "none");
+    console.log("👀 Previous guest found:", prevGuest ? prevGuest._id : "none");
 
     if (!prevGuest) {
       return res.status(404).json({ message: "Guest not found" });
@@ -141,19 +142,26 @@ export const updateGuest = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // console.log("✏️ Updated guest:", updated ? updated._id : "none");
+    console.log("✏️ Updated guest:", updated ? updated._id : "none");
 
     if (!updated) {
       return res.status(404).json({ message: "Guest not found" });
     }
 
-    // console.log("🔍 Status check: prev =", prevGuest.status, " new =", updated.status);
+    console.log("🔍 Status check: prev =", prevGuest.status, " new =", updated.status);
     if (
       req.body.status === "checked_out" &&
       prevGuest.status !== "checked_out"
     ) {
       // console.log("⚡ Triggering checkout for guest:", updated._id);
       const invoice = await checkoutGuest(updated);
+
+      const hotelOwner = await HotelOwner.findById(updated.hotelOwner);
+      console.log("hotel owner: ", hotelOwner);
+      if (hotelOwner.planType === "premium") {
+        console.log("finding plan");
+        await emailInvoice(invoice, updated, hotelOwner);
+      }
       // console.log("✅ Invoice created inside updateGuest:", invoice._id);
     } else {
       // console.log("⏭️ Checkout NOT triggered");
