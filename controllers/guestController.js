@@ -9,17 +9,15 @@ export const getMeters = async (req, res) => {
   try {
     const dentResponse = await getMetersFromDentcloud();
 
-    // Extract meters directly
-    const meters = dentResponse.meters || [];
-
-    // TODO: filter assigned meters from DB if needed
-    // e.g. const availableMeters = meters.filter(...)
+    // dentResponse is already the array of "Pxxxx_A", "Pxxxx_B"
+    const meters = dentResponse;
 
     res.status(200).json({ success: true, meters });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 
 
