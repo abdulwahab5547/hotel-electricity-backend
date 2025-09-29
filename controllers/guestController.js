@@ -5,14 +5,33 @@ import Invoice from '../models/Invoice.js';
 import HotelOwner from '../models/HotelOwner.js';
 import { emailInvoice } from '../utils/emailInvoice.js';
 
+// export const getMeters = async (req, res) => {
+//   try {
+//     const dentResponse = await getMetersFromDentcloud();
+
+//     const meters = dentResponse;
+
+//     res.status(200).json({ success: true, meters });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 export const getMeters = async (req, res) => {
   try {
-    const dentResponse = await getMetersFromDentcloud();
+    // 🔑 Find the hotel owner making this request
+    const owner = await HotelOwner.findById(req.user._id);
+    if (!owner) {
+      return res.status(404).json({ success: false, message: "Hotel owner not found" });
+    }
 
-    // dentResponse is already the array of "Pxxxx_A", "Pxxxx_B"
-    const meters = dentResponse;
+    if (!owner.dentApiKey || !owner.dentKeyId) {
+      return res.status(400).json({ success: false, message: "Dent API credentials not set for this owner" });
+    }
 
-    res.status(200).json({ success: true, meters });
+    const dentResponse = await getMetersFromDentcloud(owner.dentApiKey, owner.dentKeyId);
+
+    res.status(200).json({ success: true, meters: dentResponse });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
