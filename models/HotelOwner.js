@@ -19,13 +19,18 @@ const hotelOwnerSchema = new mongoose.Schema({
   buildingName: { type: String, required: true }, 
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+
   meterIds: [{ type: String }], 
   guests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guest' }],
   unitsConsumed: { type: Number },
   invoiceLogo: { type: String }, 
   planType: { type: String, enum: ["basic", "standard", "premium"], default: "basic" },
   useDefaultAppPassword: { type: Boolean, default: true }, 
-  customAppPassword: { type: String, default: null }
+  customAppPassword: { type: String, default: null },
+
+  // 🔑 DentCloud credentials
+  dentApiKey: { type: String, default: null },
+  dentKeyId: { type: String, default: null },
 }, { timestamps: true });
 
 
