@@ -7,7 +7,8 @@ import {
   updateHotelOwner,
   deleteHotelOwner,
   updateMyProfile, 
-  uploadInvoiceLogo
+  uploadInvoiceLogo,
+  getBuildingUsage
 } from '../controllers/hotelOwnerController.js';
 
 import { protectAdmin } from '../middleware/adminAuthMiddleware.js';
@@ -24,6 +25,9 @@ router.post(
   upload.single("invoiceLogo"),
   uploadInvoiceLogo
 );
+
+// Building usage - general dashboard
+router.get("/building-usage", getBuildingUsage);
 
 // All routes require admin authentication
 router.use(protectAdmin);

@@ -26,7 +26,7 @@
 
 
 import axios from "axios";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 // dotenv.config();
 
 const DENTCLOUD_API = "https://api.dentcloud.io/v1";
@@ -81,5 +81,56 @@ export const getMetersFromDentcloud = async (dentApiKey, dentKeyId) => {
   } catch (error) {
     console.error("❌ Error fetching meter channels:", error.message);
     throw new Error("Failed to fetch meter channels from DentCloud");
+  }
+};
+
+
+
+
+
+
+
+
+// For general dashboards and overall usage 
+export const getBuildingUsageFromDentcloud = async (dentApiKey, dentKeyId, meterIds, year, month) => {
+  try {
+    let totalUsage = 0;
+
+    // Loop over owner's saved meterIds
+    for (const meter of meterIds) {
+      const dataResponse = await axios.get(DENTCLOUD_API, {
+        params: {
+          request: "getData",
+          year,
+          month,
+          topics: "[kWHNet]",
+          meter, // <-- now using owner's meterId
+        },
+        headers: {
+          "x-api-key": dentApiKey,
+          "x-key-id": dentKeyId,
+        },
+      });
+
+      const topics = dataResponse.data.topics || [];
+      if (topics.length === 0) continue;
+
+      const first = topics[0];
+      const last = topics[topics.length - 1];
+
+      // Calculate usage for all channels in this meter
+      for (const key of Object.keys(first)) {
+        if (key.startsWith("kWHNet/Elm/")) {
+          const startVal = parseFloat(first[key]) || 0;
+          const endVal = parseFloat(last[key]) || 0;
+          totalUsage += endVal - startVal;
+        }
+      }
+    }
+
+    return totalUsage;
+  } catch (error) {
+    console.error("❌ DentCloud error:", error.message);
+    throw new Error("Failed to fetch building usage from DentCloud");
   }
 };

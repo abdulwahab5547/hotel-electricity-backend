@@ -1,9 +1,12 @@
 import HotelOwner from '../models/HotelOwner.js';
+import Guest from '../models/Guest.js';
+import axios from 'axios';
 import bcrypt from 'bcryptjs';
 import uploadToCloudinary from '../utils/uploadToCloudinary.js';
+import { getBuildingUsageFromDentcloud } from '../utils/dentcloud.js';
 
 
-
+const DENTCLOUD_API = "https://api.dentcloud.io/v1";
 
 export const uploadInvoiceLogo = async (req, res) => {
   try {
@@ -261,5 +264,129 @@ export const deleteHotelOwner = async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting hotel owner:', error.message);
     res.status(500).json({ message: 'Failed to delete hotel owner' });
+  }
+};
+
+
+
+
+
+
+
+
+
+// Get building usage - for general dashboards
+
+export const getBuildingUsage = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const ownerId = req.user._id;
+
+    console.log("📥 Incoming request:", { ownerId, month, year });
+
+    // 1. Load hotel owner
+    const hotelOwner = await HotelOwner.findById(ownerId);
+    if (!hotelOwner) {
+      return res.status(404).json({ message: "Hotel owner not found" });
+    }
+
+    // 2. Load guests
+    const guests = await Guest.find({ hotelOwner: ownerId });
+    if (!guests.length) {
+      return res.status(404).json({ message: "No guests found for this owner" });
+    }
+
+    const { dentApiKey, dentKeyId } = hotelOwner;
+    if (!dentApiKey || !dentKeyId) {
+      return res.status(400).json({ message: "DentCloud credentials missing" });
+    }
+
+    // 3. Extract guest meter IDs
+    const guestMeters = guests.map(g => g.meterID);
+
+    // Group meters by base
+    const meterGroups = {};
+    guestMeters.forEach(m => {
+      const [base, sub] = m.split("_");
+      if (!meterGroups[base]) meterGroups[base] = [];
+      meterGroups[base].push(sub);
+    });
+
+    let topicsMap = {};
+    let guestUsageMap = {}; // track usage per guest
+
+    // 4. Fetch data for each base meter
+    for (const baseMeter of Object.keys(meterGroups)) {
+      const response = await axios.get(DENTCLOUD_API, {
+        params: {
+          request: "getData",
+          year,
+          month,
+          topics: "[kWHNet]",
+          meter: baseMeter,
+        },
+        headers: {
+          "x-api-key": dentApiKey,
+          "x-key-id": dentKeyId,
+        },
+      });
+
+      const { topics } = response.data;
+
+      topics.forEach(row => {
+        const key = `${row.date}_${row.time}`;
+        if (!topicsMap[key]) {
+          topicsMap[key] = { date: row.date, time: row.time };
+        }
+
+        meterGroups[baseMeter].forEach(sub => {
+          const field = `kWHNet/Elm/${sub}`;
+          if (row[field]) {
+            const value = parseFloat(row[field]);
+            topicsMap[key][field] = value;
+
+            // find guest with this meterID
+            const meterID = `${baseMeter}_${sub}`;
+            const guest = guests.find(g => g.meterID === meterID);
+
+            if (guest) {
+              if (!guestUsageMap[meterID]) {
+                guestUsageMap[meterID] = {
+                  guestName: guest.name,
+                  guestRoom: guest.room,
+                  meterID: meterID,
+                  totalUsage: 0,
+                };
+              }
+              guestUsageMap[meterID].totalUsage += value;
+            }
+          }
+        });
+      });
+    }
+
+    const topics = Object.values(topicsMap);
+
+    // 5. Calculate total usage across all guests
+    const totalUsage = Object.values(guestUsageMap).reduce(
+      (sum, g) => sum + g.totalUsage,
+      0
+    );
+
+    const roundedTotalUsage = Number(totalUsage.toFixed(3));
+    const guestsData = Object.values(guestUsageMap).map(g => ({
+      guestName: g.guestName,
+      guestRoom: g.guestRoom,
+      meterID: g.meterID,
+      totalUsage: Number(g.totalUsage.toFixed(3)),
+    }));
+
+    return res.json({
+      totalUsage: roundedTotalUsage,
+      guests: guestsData,
+    });
+  } catch (error) {
+    console.error("❌ Error in getBuildingUsage:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

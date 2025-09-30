@@ -4,7 +4,8 @@ const guestSchema = new mongoose.Schema({
   hotelOwner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'HotelOwner', 
-    required: true
+    required: true,
+    index: true,
   },
   name: {
     type: String,

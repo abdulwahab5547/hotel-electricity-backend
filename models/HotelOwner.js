@@ -21,7 +21,7 @@ const hotelOwnerSchema = new mongoose.Schema({
   password: { type: String, required: true },
 
   meterIds: [{ type: String }], 
-  guests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guest' }],
+  // guests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guest' }],
   unitsConsumed: { type: Number },
   invoiceLogo: { type: String }, 
   planType: { type: String, enum: ["basic", "standard", "premium"], default: "basic" },
