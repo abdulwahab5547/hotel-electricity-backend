@@ -4,6 +4,7 @@ import { getMetersFromDentcloud } from '../utils/dentcloud.js';
 import Invoice from '../models/Invoice.js';
 import HotelOwner from '../models/HotelOwner.js';
 import { emailInvoice } from '../utils/emailInvoice.js';
+import axios from 'axios';
 
 // export const getMeters = async (req, res) => {
 //   try {
@@ -201,5 +202,111 @@ export const deleteGuest = async (req, res) => {
     res.json({ message: 'Guest deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete guest' });
+  }
+};
+
+
+
+const DENTCLOUD_API = "https://api.dentcloud.io/v1";
+
+function getDateRange(start, end) {
+  const dates = [];
+  let current = new Date(start);
+  const last = new Date(end);
+
+  while (current <= last) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+// Individual guest dashboard - details 
+export const getGuestUsageByRange = async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const { startDate, endDate } = req.query;
+    const ownerId = req.user._id;
+
+    console.log("📥 Guest usage request:", { id, ownerId, startDate, endDate });
+
+    // 1. Load hotel owner
+    const hotelOwner = await HotelOwner.findById(ownerId);
+    if (!hotelOwner) return res.status(404).json({ message: "Hotel owner not found" });
+
+    const { dentApiKey, dentKeyId } = hotelOwner;
+    if (!dentApiKey || !dentKeyId) {
+      return res.status(400).json({ message: "DentCloud credentials missing" });
+    }
+
+    // 2. Load guest
+    const guest = await Guest.findOne({ _id: id, hotelOwner: ownerId });
+    if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+    const { meterID, name, room } = guest;
+    const [baseMeter, sub] = meterID.split("_");
+
+    console.log("📡 Guest meter:", { baseMeter, sub });
+
+    // 3. Loop through dates
+    const dates = getDateRange(startDate, endDate);
+    let totalUsage = 0;
+    const usageDetails = [];
+
+    for (const date of dates) {
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(date.getUTCDate()).padStart(2, "0");
+
+      console.log(`🌐 Fetching DentCloud for ${year}-${month}-${day}`);
+
+      const response = await axios.get(DENTCLOUD_API, {
+        params: {
+          request: "getData",
+          year,
+          month,
+          day,
+          topics: "[kWHNet]",
+          meter: baseMeter,
+        },
+        headers: {
+          "x-api-key": dentApiKey,
+          "x-key-id": dentKeyId,
+        },
+      });
+
+      const { topics } = response.data;
+
+      if (topics && topics.length > 0) {
+        topics.forEach(row => {
+          const field = `kWHNet/Elm/${sub}`;
+          if (row[field]) {
+            const value = parseFloat(row[field]);
+            totalUsage += value;
+            usageDetails.push({
+              date: row.date,
+              time: row.time,
+              usage: value,
+            });
+          }
+        });
+      }
+    }
+
+    return res.json({
+      guestName: name,
+      guestRoom: room,
+      meterID,
+      totalUsage: Number(totalUsage.toFixed(3)),
+      usageDetails,
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getGuestUsageByRange:", error.message);
+    if (error.config) {
+      console.error("   Axios URL:", error.config.url);
+      console.error("   Axios Params:", error.config.params);
+    }
+    res.status(500).json({ message: "Server error" });
   }
 };

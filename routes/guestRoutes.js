@@ -5,7 +5,8 @@ import {
   createGuest,
   updateGuest,
   deleteGuest,
-  getMeters
+  getMeters,
+  getGuestUsageByRange
 } from '../controllers/guestController.js';
 
 import { protect } from '../middleware/authMiddleware.js';
@@ -16,6 +17,7 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/meters', getMeters);
+router.get('/:id/usage', getGuestUsageByRange);
 router.get('/', getAllGuests);
 router.get('/:id', getGuestById);
 router.post('/', createGuest);
