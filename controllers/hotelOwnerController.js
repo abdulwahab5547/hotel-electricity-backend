@@ -312,7 +312,6 @@ export const getBuildingUsage = async (req, res) => {
       meterGroups[base].push(sub);
     });
 
-    let topicsMap = {};
     let guestUsageMap = {}; // track usage per guest
 
     // 4. Fetch data for each base meter
@@ -333,56 +332,46 @@ export const getBuildingUsage = async (req, res) => {
 
       const { topics } = response.data;
 
-      topics.forEach(row => {
-        const key = `${row.date}_${row.time}`;
-        if (!topicsMap[key]) {
-          topicsMap[key] = { date: row.date, time: row.time };
-        }
+      meterGroups[baseMeter].forEach(sub => {
+        const field = `kWHNet/Elm/${sub}`;
+        const meterID = `${baseMeter}_${sub}`;
+        const guest = guests.find(g => g.meterID === meterID);
 
-        meterGroups[baseMeter].forEach(sub => {
-          const field = `kWHNet/Elm/${sub}`;
-          if (row[field]) {
-            const value = parseFloat(row[field]);
-            topicsMap[key][field] = value;
+        if (guest) {
+          // extract all readings for this sub-meter
+          const readings = topics
+            .map(row => parseFloat(row[field]))
+            .filter(v => !isNaN(v));
 
-            // find guest with this meterID
-            const meterID = `${baseMeter}_${sub}`;
-            const guest = guests.find(g => g.meterID === meterID);
+          if (readings.length > 1) {
+            const firstValue = readings[0];
+            const lastValue = readings[readings.length - 1];
+            const usage = lastValue - firstValue;
 
-            if (guest) {
-              if (!guestUsageMap[meterID]) {
-                guestUsageMap[meterID] = {
-                  guestName: guest.name,
-                  guestRoom: guest.room,
-                  meterID: meterID,
-                  totalUsage: 0,
-                };
-              }
-              guestUsageMap[meterID].totalUsage += value;
-            }
+            guestUsageMap[meterID] = {
+              guestName: guest.name,
+              guestRoom: guest.room,
+              meterID,
+              totalUsage: Number(usage.toFixed(3)),
+            };
+          } else {
+            guestUsageMap[meterID] = {
+              guestName: guest.name,
+              guestRoom: guest.room,
+              meterID,
+              totalUsage: 0,
+            };
           }
-        });
+        }
       });
     }
 
-    const topics = Object.values(topicsMap);
-
     // 5. Calculate total usage across all guests
-    const totalUsage = Object.values(guestUsageMap).reduce(
-      (sum, g) => sum + g.totalUsage,
-      0
-    );
-
-    const roundedTotalUsage = Number(totalUsage.toFixed(3));
-    const guestsData = Object.values(guestUsageMap).map(g => ({
-      guestName: g.guestName,
-      guestRoom: g.guestRoom,
-      meterID: g.meterID,
-      totalUsage: Number(g.totalUsage.toFixed(3)),
-    }));
+    const guestsData = Object.values(guestUsageMap);
+    const totalUsage = guestsData.reduce((sum, g) => sum + g.totalUsage, 0);
 
     return res.json({
-      totalUsage: roundedTotalUsage,
+      totalUsage: Number(totalUsage.toFixed(3)),
       guests: guestsData,
     });
   } catch (error) {

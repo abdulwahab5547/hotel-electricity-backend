@@ -277,19 +277,28 @@ export const getGuestUsageByRange = async (req, res) => {
 
       const { topics } = response.data;
 
-      if (topics && topics.length > 0) {
-        topics.forEach(row => {
-          const field = `kWHNet/Elm/${sub}`;
-          if (row[field]) {
-            const value = parseFloat(row[field]);
-            totalUsage += value;
-            usageDetails.push({
-              date: row.date,
-              time: row.time,
-              usage: value,
-            });
-          }
-        });
+      if (topics && topics.length > 1) {
+        const readings = topics
+          .map(row => ({
+            date: row.date,
+            time: row.time,
+            value: parseFloat(row[`kWHNet/Elm/${sub}`])
+          }))
+          .filter(r => !isNaN(r.value));
+
+        if (readings.length > 1) {
+          const first = readings[0];
+          const last = readings[readings.length - 1];
+          const usage = last.value - first.value;
+
+          totalUsage += usage;
+          usageDetails.push({
+            date: first.date,
+            startTime: first.time,
+            endTime: last.time,
+            usage: Number(usage.toFixed(3))
+          });
+        }
       }
     }
 
