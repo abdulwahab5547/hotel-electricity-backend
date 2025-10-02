@@ -1,3 +1,4 @@
+import axios from "axios";
 import nodemailer from "nodemailer";
 import PDFDocument from "pdfkit";
 
@@ -41,33 +42,55 @@ export const generateAndEmailInvoice = async (invoice, guest, hotelOwner) => {
     });
 
     // --- PDF Layout ---
-    // Hotel Logo (if available)
     if (hotelOwner.invoiceLogo) {
-        try {
-          doc.image(hotelOwner.invoiceLogo, 50, 40, { width: 100 });
-        } catch (e) {
-          console.warn("⚠️ Could not load invoice logo:", e.message);
-        }
+      try {
+        const response = await axios.get(hotelOwner.invoiceLogo, { responseType: "arraybuffer" });
+        const imgBuffer = Buffer.from(response.data, "binary");
+        doc.image(imgBuffer, 50, 40, { width: 100 });
+        doc.moveDown(3); // add space after logo
+      } catch (e) {
+        console.warn("⚠️ Could not load invoice logo:", e.message);
+        doc.moveDown(2);
       }
+    }
 
     doc.fontSize(20).text("Invoice", { align: "center" });
-    doc.moveDown();
+    doc.moveDown(2);
 
     doc.fontSize(12).text(`Guest: ${guest.name}`);
+    doc.moveDown(0.5);
     doc.text(`Room: ${guest.room}`);
+    doc.moveDown(0.5);
     doc.text(`Email: ${guest.email}`);
+    doc.moveDown(0.5);
     doc.text(`Period: ${invoice.startDate} → ${invoice.endDate}`);
+    doc.moveDown(0.5);
     doc.text(`Rate: $${invoice.costPerKwh}/kWh`);
-    doc.moveDown();
+    doc.moveDown(2);
 
-    // Table header
-    doc.fontSize(12).text("Date       Start      End      Usage(kWh)   Cost($)", { underline: true });
+    // Table header with fixed X positions
+    const tableTop = doc.y;
+    const colX = [50, 150, 250, 370, 470]; // adjust spacing between columns
+
+    doc.fontSize(12).text("Date", colX[0], tableTop, { underline: true });
+    doc.text("Start", colX[1], tableTop, { underline: true });
+    doc.text("End", colX[2], tableTop, { underline: true });
+    doc.text("Usage (kWh)", colX[3], tableTop, { underline: true });
+    doc.text("Cost ($)", colX[4], tableTop, { underline: true });
+
+    let rowY = tableTop + 20;
     invoice.usageDetails.forEach(d => {
-      doc.text(`${d.date}   ${d.startTime} - ${d.endTime}   ${d.usage}   $${d.cost}`);
+      doc.text(d.date, colX[0], rowY);
+      doc.text(d.startTime, colX[1], rowY);
+      doc.text(d.endTime, colX[2], rowY);
+      doc.text(d.usage.toString(), colX[3], rowY);
+      doc.text(`$${d.cost}`, colX[4], rowY);
+      rowY += 20; // add vertical spacing between rows
     });
 
-    doc.moveDown();
+    doc.moveDown(3);
     doc.fontSize(14).text(`Total Usage: ${invoice.totalUsage} kWh`);
+    doc.moveDown(1);
     doc.fontSize(16).text(`Total Cost: $${invoice.totalCost.toFixed(2)}`, { underline: true });
 
     doc.end();
