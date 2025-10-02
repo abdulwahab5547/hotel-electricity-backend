@@ -6,7 +6,9 @@ import {
   updateGuest,
   deleteGuest,
   getMeters,
-  getGuestUsageByRange
+  getGuestUsageByRange,
+  getGuestUsageByMonths,
+  generateGuestInvoice
 } from '../controllers/guestController.js';
 
 import { protect } from '../middleware/authMiddleware.js';
@@ -18,6 +20,9 @@ router.use(protect);
 
 router.get('/meters', getMeters);
 router.get('/:id/usage', getGuestUsageByRange);
+router.get('/:id/usage-by-months', getGuestUsageByMonths);
+router.get('/:id/invoice', generateGuestInvoice);
+
 router.get('/', getAllGuests);
 router.get('/:id', getGuestById);
 router.post('/', createGuest);

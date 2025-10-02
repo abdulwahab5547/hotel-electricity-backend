@@ -4,6 +4,7 @@ import { getMetersFromDentcloud } from '../utils/dentcloud.js';
 import Invoice from '../models/Invoice.js';
 import HotelOwner from '../models/HotelOwner.js';
 import { emailInvoice } from '../utils/emailInvoice.js';
+import { generateAndEmailInvoice } from '../utils/invoice.js';
 import axios from 'axios';
 
 // export const getMeters = async (req, res) => {
@@ -312,6 +313,239 @@ export const getGuestUsageByRange = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Error in getGuestUsageByRange:", error.message);
+    if (error.config) {
+      console.error("   Axios URL:", error.config.url);
+      console.error("   Axios Params:", error.config.params);
+    }
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
+export const generateGuestInvoice = async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const { startDate, endDate, costPerKwh } = req.query; // frontend sends in body
+    const ownerId = req.user._id;
+
+    console.log("📥 Invoice generation request:", { id, ownerId, startDate, endDate, costPerKwh });
+
+    // 1. Load hotel owner
+    const hotelOwner = await HotelOwner.findById(ownerId);
+    if (!hotelOwner) return res.status(404).json({ message: "Hotel owner not found" });
+
+    const { dentApiKey, dentKeyId } = hotelOwner;
+    if (!dentApiKey || !dentKeyId) {
+      return res.status(400).json({ message: "DentCloud credentials missing" });
+    }
+
+    // 2. Load guest
+    const guest = await Guest.findOne({ _id: id, hotelOwner: ownerId });
+    if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+    const { meterID, name, room, email } = guest;
+    const [baseMeter, sub] = meterID.split("_");
+
+    // 3. Calculate usage (reuse logic)
+    const dates = getDateRange(startDate, endDate);
+    let totalUsage = 0;
+    const usageDetails = [];
+
+    for (const date of dates) {
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(date.getUTCDate()).padStart(2, "0");
+
+      const response = await axios.get(DENTCLOUD_API, {
+        params: {
+          request: "getData",
+          year,
+          month,
+          day,
+          topics: "[kWHNet]",
+          meter: baseMeter,
+        },
+        headers: {
+          "x-api-key": dentApiKey,
+          "x-key-id": dentKeyId,
+        },
+      });
+
+      const { topics } = response.data;
+
+      if (topics && topics.length > 1) {
+        const readings = topics
+          .map(row => ({
+            date: row.date,
+            time: row.time,
+            value: parseFloat(row[`kWHNet/Elm/${sub}`])
+          }))
+          .filter(r => !isNaN(r.value));
+
+        if (readings.length > 1) {
+          const first = readings[0];
+          const last = readings[readings.length - 1];
+          const usage = last.value - first.value;
+
+          totalUsage += usage;
+          usageDetails.push({
+            date: first.date,
+            startTime: first.time,
+            endTime: last.time,
+            usage: Number(usage.toFixed(3)),
+            cost: Number((usage * costPerKwh).toFixed(2))
+          });
+        }
+      }
+    }
+
+    // 4. Invoice object
+    const invoice = {
+      guestName: name,
+      guestRoom: room,
+      guestEmail: email,
+      startDate,
+      endDate,
+      costPerKwh,
+      totalUsage: Number(totalUsage.toFixed(3)),
+      usageDetails,
+      totalCost: Number((totalUsage * costPerKwh).toFixed(2))
+    };
+
+    // 5. Send invoice email
+    await generateAndEmailInvoice(invoice, guest, hotelOwner);
+
+    return res.json({ message: "Invoice generated and emailed successfully", invoice });
+
+  } catch (error) {
+    console.error("❌ Error in generateGuestInvoice:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
+export const getGuestUsageByMonths = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ownerId = req.user._id;
+
+    console.log("📥 Guest monthly usage request:", { id, ownerId });
+
+    // 1. Load hotel owner
+    const hotelOwner = await HotelOwner.findById(ownerId);
+    if (!hotelOwner) return res.status(404).json({ message: "Hotel owner not found" });
+
+    const { dentApiKey, dentKeyId } = hotelOwner;
+    if (!dentApiKey || !dentKeyId) {
+      return res.status(400).json({ message: "DentCloud credentials missing" });
+    }
+
+    // 2. Load guest
+    const guest = await Guest.findOne({ _id: id, hotelOwner: ownerId });
+    if (!guest) return res.status(404).json({ message: "Guest not found" });
+
+    const { meterID, name, room } = guest;
+    const [baseMeter, sub] = meterID.split("_");
+
+    console.log("📡 Guest meter:", { baseMeter, sub });
+
+    // 🔹 Helper to fetch usage for a given date range
+    const fetchUsageForRange = async (startDate, endDate) => {
+      const dates = getDateRange(startDate, endDate);
+      let totalUsage = 0;
+
+      for (const date of dates) {
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(date.getUTCDate()).padStart(2, "0");
+
+        console.log(`🌐 Fetching DentCloud for ${year}-${month}-${day}`);
+
+        const response = await axios.get(DENTCLOUD_API, {
+          params: {
+            request: "getData",
+            year,
+            month,
+            day,
+            topics: "[kWHNet]",
+            meter: baseMeter,
+          },
+          headers: {
+            "x-api-key": dentApiKey,
+            "x-key-id": dentKeyId,
+          },
+        });
+
+        const { topics } = response.data;
+
+        if (topics && topics.length > 1) {
+          const readings = topics
+            .map(row => ({
+              date: row.date,
+              time: row.time,
+              value: parseFloat(row[`kWHNet/Elm/${sub}`])
+            }))
+            .filter(r => !isNaN(r.value));
+
+          if (readings.length > 1) {
+            const first = readings[0];
+            const last = readings[readings.length - 1];
+            const usage = last.value - first.value;
+            totalUsage += usage;
+          }
+        }
+      }
+
+      return Number(totalUsage.toFixed(3));
+    };
+
+    // 🔹 Date ranges for current + last 2 months
+    const now = new Date();
+    const monthNames = [
+      "January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    ];
+
+    const firstDayCurrent = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const today = new Date();
+
+    const firstDayLast = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const lastDayLast = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+
+    const firstDayTwoAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1));
+    const lastDayTwoAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 0));
+
+    // 🔹 Fetch usage for each month
+    const currentMonthUsage = await fetchUsageForRange(firstDayCurrent, today);
+    const lastMonthUsage = await fetchUsageForRange(firstDayLast, lastDayLast);
+    const twoMonthsAgoUsage = await fetchUsageForRange(firstDayTwoAgo, lastDayTwoAgo);
+
+    return res.json({
+      guestName: name,
+      guestRoom: room,
+      meterID,
+      usage: {
+        currentMonth: {
+          month: monthNames[now.getUTCMonth()],
+          usage: currentMonthUsage
+        },
+        lastMonth: {
+          month: monthNames[firstDayLast.getUTCMonth()],
+          usage: lastMonthUsage
+        },
+        twoMonthsAgo: {
+          month: monthNames[firstDayTwoAgo.getUTCMonth()],
+          usage: twoMonthsAgoUsage
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getGuestUsageByMonths:", error.message);
     if (error.config) {
       console.error("   Axios URL:", error.config.url);
       console.error("   Axios Params:", error.config.params);
