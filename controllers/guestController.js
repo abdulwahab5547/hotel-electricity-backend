@@ -21,20 +21,30 @@ import axios from 'axios';
 
 export const getMeters = async (req, res) => {
   try {
+    console.log("➡️ getMeters called by user:", req.user._id);
+
     // 🔑 Find the hotel owner making this request
     const owner = await HotelOwner.findById(req.user._id);
+    console.log("🔍 Found owner:", owner);
+
     if (!owner) {
+      console.warn("⚠️ Hotel owner not found");
       return res.status(404).json({ success: false, message: "Hotel owner not found" });
     }
 
     if (!owner.dentApiKey || !owner.dentKeyId) {
+      console.warn("⚠️ Dent API credentials missing for owner");
       return res.status(400).json({ success: false, message: "Dent API credentials not set for this owner" });
     }
 
+    console.log("🔑 Using Dent API credentials:", owner.dentApiKey, owner.dentKeyId);
+
     const dentResponse = await getMetersFromDentcloud(owner.dentApiKey, owner.dentKeyId);
+    console.log("✅ DentCloud meters response:", dentResponse);
 
     res.status(200).json({ success: true, meters: dentResponse });
   } catch (error) {
+    console.error("❌ getMeters error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

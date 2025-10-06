@@ -40,6 +40,7 @@ export const getMetersFromDentcloud = async (dentApiKey, dentKeyId) => {
     console.log("🔑 Using KEY_ID:", dentKeyId);
 
     // 1. Get list of meters
+    console.log("📡 Fetching meters list from DentCloud...");
     const metersResponse = await axios.get(DENTCLOUD_API, {
       params: { request: "getMeters" },
       headers: {
@@ -48,11 +49,25 @@ export const getMetersFromDentcloud = async (dentApiKey, dentKeyId) => {
       },
     });
 
-    const meters = metersResponse.data.meters || [];
+    console.log("✅ Meters API Response:", JSON.stringify(metersResponse.data, null, 2));
+
+    const meters = Array.isArray(metersResponse.data?.meters)
+      ? metersResponse.data.meters
+      : [];
+
+    if (meters.length === 0) {
+      console.log("⚠️ No meters found in response.");
+      return [];
+    }
+
+    console.log(`📊 Found ${meters.length} meter(s):`, meters);
+
     let results = [];
 
     // 2. For each meter, fetch headers
     for (const meter of meters) {
+      console.log(`📡 Fetching data for meter: ${meter}...`);
+
       const dataResponse = await axios.get(DENTCLOUD_API, {
         params: {
           request: "getData",
@@ -68,22 +83,37 @@ export const getMetersFromDentcloud = async (dentApiKey, dentKeyId) => {
         },
       });
 
+      console.log(`✅ Data API Response for ${meter}:`, JSON.stringify(dataResponse.data, null, 2));
+
       const headers = dataResponse.data.headers || [];
+      console.log(`📋 Headers for ${meter}:`, headers);
+
       const channels = headers
         .filter((h) => h.includes("kWHNet/Elm/"))
         .map((h) => h.split("/").pop());
 
-      const combined = channels.map((ch) => `${meter}_${ch}`);
-      results.push(...combined);
+      console.log(`⚙️ Extracted channels for ${meter}:`, channels);
+
+      if (channels.length > 0) {
+        const combined = channels.map((ch) => `${meter}_${ch}`);
+        console.log(`🧩 Combined meter+channel values for ${meter}:`, combined);
+        results.push(...combined);
+      } else {
+        console.log(`⚠️ No channels found for ${meter}, adding meter ID only.`);
+        results.push(meter);
+      }
     }
 
+    console.log("🎯 Final combined results:", results);
     return results;
   } catch (error) {
     console.error("❌ Error fetching meter channels:", error.message);
+    if (error.response) {
+      console.error("🧾 Error Response Data:", JSON.stringify(error.response.data, null, 2));
+    }
     throw new Error("Failed to fetch meter channels from DentCloud");
   }
 };
-
 
 
 
